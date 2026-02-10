@@ -5,11 +5,11 @@ module top #(
     parameter ADDR_WIDTH      = 16,
     parameter TILE_ADDR_WIDTH = 3,  // 8 locations for 4x4 tile
     parameter MATRIX_ROWS     = 376,
-    parameter WEIGHT_MEM_SIZE=3008,
+    parameter WEIGHT_MEM_SIZE=37600,
     parameter DATA_MEM_SIZE=94,
-    parameter MATRIX_COLS     = 8,
+    parameter MATRIX_COLS     = 100,
     parameter DATA_TILE_WIDTH=2,
-    parameter DATA_VECTOR_LENGTH=8 ,
+    parameter DATA_VECTOR_LENGTH=100,
     parameter TILE_WIDTH=4
 )(
     input  wire clk,
@@ -98,7 +98,8 @@ reg [6:0]            gb_rd_data_addr_reg;
 reg [6:0] tile_row_idx; 
 reg [6:0] tile_col_idx;  
 wire [ADDR_WIDTH-1:0] tile_base_addr;  // Calculated base address for current tile
-assign tile_base_addr = ((tile_row_idx <<3)+ tile_col_idx) << 2;
+// MATRIX_COLS/TILE_WIDTH = 100/4 = 25 = 16 + 8 + 1 = 2^4 + 2^3 + 2^0
+assign tile_base_addr = (((tile_row_idx << 4) + (tile_row_idx << 3) + tile_row_idx) + tile_col_idx) << 2;
 reg [3:0] base_addr_reg_1,base_addr_reg_2;
 // --- Compute Read Control ---
 reg [TILE_ADDR_WIDTH-1:0] weight_read_addr_1, weight_read_addr_2, weight_read_addr_3, weight_read_addr_4;  // Separate read addresses for each weight BRAM
