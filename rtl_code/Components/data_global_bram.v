@@ -2,7 +2,7 @@
 module data_global_bram #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 6,    // 64 locations
-    parameter MEM_SIZE=8
+    parameter MEM_SIZE=100
 )(
     input  wire                 clk,
     input  wire                 rst_n,
@@ -66,5 +66,6 @@ module data_global_bram #(
         if (re)
             dout <= bram[rd_addr]; 
     end
+
 
 endmodule
