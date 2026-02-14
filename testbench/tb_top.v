@@ -59,7 +59,7 @@ module tb_top;
         @(posedge clk);
         we = 0;
         // End simulation
-        #10000;
+        #10000; 
 
 
 
