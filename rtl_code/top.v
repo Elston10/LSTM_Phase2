@@ -179,7 +179,6 @@ always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
       next_addr_reg <=0;    
     else if (almost_full && state==COMPUTE && compute_count>=1 )begin
-        write_buffer_select <= ~write_buffer_select;
         next_addr_reg <= next_addr_reg +4;
     end
     else if(row_jumped)begin
@@ -203,7 +202,7 @@ always @(posedge clk or negedge rst_n) begin
         write_active<=0;
         base_addr_reg_1 <= 0;
         base_addr_reg_2 <= 4;
-        next_addr_reg <= 0;
+        gb_rd_data_addr_reg <= 0;
     end else begin
         write_active <= we_data;
         // LOAD_FIRST state logic
@@ -231,22 +230,21 @@ always @(posedge clk or negedge rst_n) begin
             if (we_data && gb_rd_data_addr_reg == base_addr_reg_2 + 3) begin
                 we_data <= 1'b0;
             end
+        
+        if(state==COMPUTE)begin
+            if(burst_full && compute_count>0)begin
+               we_data<=1'b1;
+               gb_rd_data_addr_reg <= next_addr_reg;
+            end
+            if (we_data && gb_rd_data_addr_reg == next_addr_reg+3) 
+                    we_data <= 1'b0;
+            if(we_data && gb_rd_data_addr_reg<next_addr_reg + 3)
+                gb_rd_data_addr_reg <= gb_rd_data_addr_reg + 1;
         end
-    if(state==COMPUTE)begin
-        if(burst_full && compute_count>0)begin
-           we_data<=1'b1;
-           gb_rd_data_addr_reg <= next_addr_reg;
-        end
-        if (we_data && gb_rd_data_addr_reg == next_addr_reg+3) 
-                we_data <= 1'b0;
-        if(we_data && gb_rd_data_addr_reg<next_addr_reg + 3)
-            gb_rd_data_addr_reg <= gb_rd_data_addr_reg + 1;
-        end
-        //if(next_addr_reg ==DATA_VECTOR_LENGTH-4 && done_burst)
-           // next_addr_reg <=0;
         
         if(gb_rd_data_addr_reg==DATA_VECTOR_LENGTH-1)
             gb_rd_data_addr_reg <=0;
+    end
 end
 // --- Data Tile Address Increment Logic ---
 reg [7:0] tile_count;
@@ -262,14 +260,10 @@ end
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         gb_rd_weight_addr_reg <= 0;
-        gb_rd_data_addr_reg <= 0;
-        reset_done<=0;
-        data_sel <= 2'b00;
         tile_row_idx <= 0;
         tile_col_idx <= 0;
         data_tile_write_addr_1_reg <= 0;
         data_tile_write_addr_2_reg <= 0;
-        compute_count <= 0;
     end else begin
         if (gb_re) begin
             gb_rd_weight_addr_reg <= gb_addr;
@@ -335,6 +329,9 @@ always @(*) begin
 end
 reg computing;
 always @(posedge clk or negedge rst_n)begin
+   if(!rst_n )
+     compute_count<=0;
+   else 
    if(compute_done)
      compute_count<=compute_count+1;
 end
@@ -347,18 +344,7 @@ always @(posedge clk or negedge rst_n) begin
         computing <= 0;
     end
 end
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        compute_count <= 0;
-    end else begin
-        if (compute_count==0 && tiles_ready) begin
-            read_buffer_select<=1'b1;
-        end 
-        if(tiles_ready_rising )begin
-             read_buffer_select<=~read_buffer_select;
-        end
-    end
-end
+// Removed - compute_count now handled in dedicated always block at line 335
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         read_buffer_select  <= 1'b0;
@@ -388,6 +374,15 @@ always @(posedge clk or negedge rst_n) begin
                 data_sel <= 2'b00;
             end
             COMPUTE: begin
+                // Toggle write_buffer_select when almost_full
+                if (almost_full && compute_count>=1)
+                    write_buffer_select <= ~write_buffer_select;
+                
+                // Toggle read_buffer_select on tiles_ready
+                if (compute_count==0 && tiles_ready)
+                    read_buffer_select<=1'b1;
+                if(tiles_ready_rising)
+                    read_buffer_select<=~read_buffer_select;
             
                 if(computing && !compute_done)begin
                      data_sel<=2'b00;
@@ -791,7 +786,8 @@ sigmoid #(.WIDTH(16),
     .sigmoid_out(input_activation_output)
 );
 tanh #(
-    .WIDTH(16),
+    .INPUT_WIDTH(16),
+    .OUTPUT_WIDTH(16),
     .FRAC_BITS(8)
 ) candidate_gate ( .input_value(output_data),
     //.we(candidate_write),
