@@ -20,6 +20,7 @@ module top #(
     output wire [DATA_WIDTH-1:0]ht_output,
     output wire done_data
 );
+wire data_global_reset_done;
 parameter NUM_TILES_TOTAL = (MATRIX_ROWS / TILE_WIDTH) * (MATRIX_COLS / TILE_WIDTH);
 parameter FORGET_LIMIT=NUM_TILES_TOTAL/4;
 parameter INPUT_LIMIT=NUM_TILES_TOTAL/2;
@@ -49,6 +50,7 @@ wire [DATA_WIDTH-1:0] weight_tile_data_out1_B, weight_tile_data_out2_B, weight_t
 localparam IDLE       = 2'd0;   
 localparam LOAD_FIRST = 2'd1;  // Initial load state
 localparam COMPUTE    = 2'd2;  // Continuous compute + load state
+localparam DONE =       2'd3;
 
 wire data_done_1, data_done_2;
 
@@ -294,6 +296,8 @@ always @(posedge clk or negedge rst_n) begin
             weight_loaded <= 1;
         if (global_done_data)
             data_loaded <= 1;
+        else 
+          data_loaded <= 0; // Reset data_loaded if global_done_data goes low (e.g., on new load)
     end
 end
 // ------------------- FSM STATE REGISTER -------------------
@@ -323,10 +327,11 @@ always @(*) begin
         COMPUTE: begin
             // Stay in COMPUTE state, buffers will ping-pong
               next_state=COMPUTE;
-              if (compute_count == NUM_TILES_TOTAL) begin
-                  next_state = IDLE;
+              if(compute_count==NUM_TILES_TOTAL+1)begin
+                  next_state=IDLE;
               end
         end
+        default: next_state = IDLE;
     endcase     
 end
 reg computing;
@@ -336,8 +341,8 @@ always @(posedge clk or negedge rst_n)begin
    else 
    if(compute_done)
      compute_count<=compute_count+1;
-   if(compute_count==NUM_TILES_TOTAL)
-     compute_count<=0;
+    if(compute_count==NUM_TILES_TOTAL+1)
+        compute_count<=0;
 end
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
@@ -462,6 +467,7 @@ weight_global_bram #(
 
 data_global_bram #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(7)) data_bram (
     .clk(clk), .rst_n(rst_n),
+    .reset_done(data_global_reset_done),
     .wr_addr(gb_data_addr),
     .rd_addr(gb_rd_data_addr),
     .din(data_in),
@@ -636,6 +642,7 @@ wire done_row1,done_row2,done_row3;
 wire [OUTPUT_WIDTH-1:0] accumulated_sum1, accumulated_sum2, accumulated_sum3, accumulated_sum4;    
 //---------------- ADDING TILE OUTPUTS FROM MVM-----------------
 wire acc_clear_1,acc_clear_2,acc_clear_3,acc_clear_4;
+assign data_global_reset_done=(compute_count==(OUTPUT_LIMIT))?1'b1:1'b0;
 accumulated_adder #(
     .DATA_WIDTH(OUTPUT_WIDTH)
 ) acc_1 (
