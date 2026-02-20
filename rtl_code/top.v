@@ -16,8 +16,9 @@ module top #(
     input  wire rst_n,
     input  wire we,
     input  wire [DATA_WIDTH-1:0] data_in,
-    input  wire [DATA_WIDTH-1:0] weight_in,
-    input  wire [6:0] gb_data_addr
+    input  wire [6:0] gb_data_addr,
+    output wire [DATA_WIDTH-1:0]ht_output,
+    output wire done_data
 );
 parameter NUM_TILES_TOTAL = (MATRIX_ROWS / TILE_WIDTH) * (MATRIX_COLS / TILE_WIDTH);
 parameter FORGET_LIMIT=NUM_TILES_TOTAL/4;
@@ -322,9 +323,10 @@ always @(*) begin
         COMPUTE: begin
             // Stay in COMPUTE state, buffers will ping-pong
               next_state=COMPUTE;
+              if (compute_count == NUM_TILES_TOTAL) begin
+                  next_state = IDLE;
+              end
         end
-
-        default: next_state = IDLE;
     endcase     
 end
 reg computing;
@@ -334,6 +336,8 @@ always @(posedge clk or negedge rst_n)begin
    else 
    if(compute_done)
      compute_count<=compute_count+1;
+   if(compute_count==NUM_TILES_TOTAL)
+     compute_count<=0;
 end
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
@@ -769,7 +773,7 @@ always @(posedge clk or negedge rst_n) begin
         end
     end
 end
-wire forget_write,input_write,candidate_write,output_write,done_data;
+wire forget_write,input_write,candidate_write,output_write;
 reg gate_read;
 wire [DATA_WIDTH-1:0] forget_activation_output, input_activation_output,candidate_activation_output, output_activation_output;
 wire [DATA_WIDTH-1:0] el_forget_in, el_input_in, el_candidate_in, el_output_in;
@@ -806,7 +810,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 wire done_forget, done_input, done_candidate, done_output;
 wire read_done_forget, read_done_input, read_done_candidate, read_done_output;
-wire done_data,read_done_data;
+wire read_done_data;
 assign done_data = done_forget & done_input & done_candidate & done_output; 
 assign read_done_data=read_done_forget & read_done_input & read_done_candidate & read_done_output;
 // Set write enables based on activation_buffer_set_select
