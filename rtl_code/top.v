@@ -338,11 +338,12 @@ reg computing;
 always @(posedge clk or negedge rst_n)begin
    if(!rst_n )
      compute_count<=0;
-   else 
+   else begin
    if(compute_done)
      compute_count<=compute_count+1;
-    if(compute_count==NUM_TILES_TOTAL+1)
+   else if(compute_count==NUM_TILES_TOTAL+1)
         compute_count<=0;
+   end
 end
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
