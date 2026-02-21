@@ -5,7 +5,7 @@ module data_global_bram #(
     parameter MEM_SIZE=100
 )(
     input  wire                 clk,
-    input  wire                 rst_n,
+    input  wire                 rst_n,reset_done,
     input  wire [ADDR_WIDTH-1:0] wr_addr, // Renamed for Write Address
     input  wire [ADDR_WIDTH-1:0] rd_addr, // <--- NEW: Dedicated Read Address
     input  wire [DATA_WIDTH-1:0] din,
@@ -31,6 +31,10 @@ module data_global_bram #(
             write_count <= 0;
             done        <= 1'b0;
         end 
+        if(reset_done) begin
+            write_count <= 0;
+            done        <= 1'b0;
+        end
         // Reset done/count when a new write sequence starts after completion
         else if (we && (write_count == MAX_COUNT)) begin
              write_count <= 0;
@@ -66,6 +70,5 @@ module data_global_bram #(
         if (re)
             dout <= bram[rd_addr]; 
     end
-
 
 endmodule
