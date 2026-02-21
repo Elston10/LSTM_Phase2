@@ -31,7 +31,7 @@ module data_global_bram #(
             write_count <= 0;
             done        <= 1'b0;
         end 
-        if(reset_done) begin
+        else if(reset_done) begin
             write_count <= 0;
             done        <= 1'b0;
         end
