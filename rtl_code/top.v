@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module top #(
+module top_multiplier #(
     parameter DATA_WIDTH      =16,
     parameter OUTPUT_WIDTH    = 16,
     parameter ADDR_WIDTH      = 16,
@@ -18,18 +18,20 @@ module top #(
     input  wire [DATA_WIDTH-1:0] data_in,
     input  wire [6:0] gb_data_addr,
     output wire [DATA_WIDTH-1:0]ht_output,
-    output wire done_data
+    output wire done_data,
+    input inter_rst
 );
 wire data_global_reset_done;
-parameter NUM_TILES_TOTAL = (MATRIX_ROWS / TILE_WIDTH) * (MATRIX_COLS / TILE_WIDTH);
-parameter FORGET_LIMIT=NUM_TILES_TOTAL/4;
-parameter INPUT_LIMIT=NUM_TILES_TOTAL/2;
-parameter CANDIDATE_LIMIT=(3*NUM_TILES_TOTAL)/4;
-parameter OUTPUT_LIMIT=NUM_TILES_TOTAL;
-parameter SWITCH_LIMIT=DATA_MEM_SIZE;
+localparam NUM_TILES_TOTAL = (MATRIX_ROWS / TILE_WIDTH) * (MATRIX_COLS / TILE_WIDTH);
+localparam FORGET_LIMIT=NUM_TILES_TOTAL/4;
+localparam INPUT_LIMIT=NUM_TILES_TOTAL/2;
+localparam CANDIDATE_LIMIT=(3*NUM_TILES_TOTAL)/4;
+localparam OUTPUT_LIMIT=NUM_TILES_TOTAL;
+localparam SWITCH_LIMIT=DATA_MEM_SIZE;
 wire [OUTPUT_WIDTH-1:0] pe1,pe2,pe3,pe4;
 wire mvm_en_diag4,mvm_en_diag5,mvm_en_diag6;
 reg [1:0] data_sel;
+reg [16:0] compute_count;
 wire start_compute;
 reg computing;
 wire row_jumped;
@@ -101,8 +103,9 @@ reg [6:0]            gb_rd_data_addr_reg;
 reg [6:0] tile_row_idx; 
 reg [6:0] tile_col_idx;  
 wire [ADDR_WIDTH-1:0] tile_base_addr;  // Calculated base address for current tile
-// MATRIX_COLS/TILE_WIDTH = 100/4 = 25 = 16 + 8 + 1 = 2^4 + 2^3 + 2^0
-assign tile_base_addr = (((tile_row_idx << 4) + (tile_row_idx << 3) + tile_row_idx) + tile_col_idx) << 2;
+// tile_row_idx * 4 * 100 + tile_col_idx * 4
+// = tile_row_idx * 400 + tile_col_idx * 4
+assign tile_base_addr = ((tile_row_idx << 8) + (tile_row_idx << 7) + (tile_row_idx << 4)) + (tile_col_idx << 2);
 reg [3:0] base_addr_reg_1,base_addr_reg_2;
 // --- Compute Read Control ---
 reg [TILE_ADDR_WIDTH-1:0] weight_read_addr_1, weight_read_addr_2, weight_read_addr_3, weight_read_addr_4;  // Separate read addresses for each weight BRAM
@@ -148,7 +151,7 @@ always @(posedge clk or negedge rst_n) begin
     else
         prev_start_burst_cond <= start_burst_cond;
 end
-wire start_burst;
+
 reg burst_done_d;
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
@@ -261,7 +264,7 @@ always @(posedge clk or negedge rst_n) begin
     end
 end 
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         gb_rd_weight_addr_reg <= 0;
         tile_row_idx <= 0;
         tile_col_idx <= 0;
@@ -307,7 +310,7 @@ always @(posedge clk or negedge rst_n) begin
     else
         state <= next_state;
 end
-reg [16:0] compute_count;
+
 // ------------------- FSM NEXT STATE LOGIC -------------------
 always @(*) begin
     next_state = state;
@@ -334,16 +337,19 @@ always @(*) begin
         default: next_state = IDLE;
     endcase     
 end
-reg computing;
+
 always @(posedge clk or negedge rst_n)begin
    if(!rst_n )
      compute_count<=0;
    else begin
    if(compute_done)
      compute_count<=compute_count+1;
-   else if(compute_count==NUM_TILES_TOTAL+1)
+   else if(compute_count==NUM_TILES_TOTAL+1) 
         compute_count<=0;
-   end
+  
+   else if(inter_rst) 
+    compute_count<=0;
+  end
 end
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
@@ -501,7 +507,8 @@ bram_burst #(
     .tile_dout2(tile_dout2), .tile_dout3(tile_dout3),
     .we0(we0), .we1(we1), .we2(we2), .we3(we3),
     .burst_write_count(burst_write_count),
-    .almost_full_pulse(almost_full)
+    .almost_full_pulse(almost_full),
+    .inter_rst(inter_rst)
 );
 
 // ---------------- DATA TILE BRAMs (Ping Pong) -------------------
@@ -639,7 +646,7 @@ mvm #(
     .en_diag5_out(mvm_en_diag5),    
     .en_diag6_out(mvm_en_diag6)
 );
-wire done_row1,done_row2,done_row3;
+
 wire [OUTPUT_WIDTH-1:0] accumulated_sum1, accumulated_sum2, accumulated_sum3, accumulated_sum4;    
 //---------------- ADDING TILE OUTPUTS FROM MVM-----------------
 wire acc_clear_1,acc_clear_2,acc_clear_3,acc_clear_4;
@@ -685,6 +692,7 @@ accumulated_adder #(
     .acc_sum(accumulated_sum4)  
 );
 // ------------FINAL TILED OUTPUT BUFFERING-------------------- 
+reg [4:0] tile_count_reg_1,tile_count_reg_2,tile_count_reg_3,tile_count_reg_4;
 wire en_output_write;  
 assign acc_clear_1=tile_count_reg_1==(MATRIX_COLS/TILE_WIDTH)+1 ? 1:0;
 assign acc_clear_2=tile_count_reg_2==(MATRIX_COLS/TILE_WIDTH)+1 ? 1:0;
@@ -700,7 +708,7 @@ assign output_data_sel = acc_clear_1 ? 2'b00 :
 reg [ADDR_WIDTH-1:0] output_write_addr,output_read_addr;
 wire [ADDR_WIDTH-1:0] output_write_count_1;
 wire [OUTPUT_WIDTH-1:0] output_data;
-reg [4:0] tile_count_reg_1,tile_count_reg_2,tile_count_reg_3,tile_count_reg_4;
+
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
        output_write_addr<=0;
@@ -759,6 +767,7 @@ mod4_selector #(
     .value_in(DATA_MEM_SIZE),
     .sel(switch_data_sel)
 );
+reg gate_read;
 // Combined activation buffer control and address management
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -782,7 +791,7 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 wire forget_write,input_write,candidate_write,output_write;
-reg gate_read;
+
 wire [DATA_WIDTH-1:0] forget_activation_output, input_activation_output,candidate_activation_output, output_activation_output;
 wire [DATA_WIDTH-1:0] el_forget_in, el_input_in, el_candidate_in, el_output_in;
 sigmoid #( .WIDTH(16),
@@ -797,13 +806,9 @@ sigmoid #(.WIDTH(16),
    // .we(input_write),
     .sigmoid_out(input_activation_output)
 );
-tanh #(
-    .INPUT_WIDTH(16),
-    .OUTPUT_WIDTH(16),
-    .FRAC_BITS(8)
-) candidate_gate ( .input_value(output_data),
+tanh candidate_gate ( .x(output_data),
     //.we(candidate_write),
-    .tanh_out(candidate_activation_output)
+    .y(candidate_activation_output)
 );
 sigmoid #(.WIDTH(16),
 .FRAC_BITS(8)
@@ -828,8 +833,8 @@ demux1to4 #(
     .data_in(1'b1),
     .enable(acc_clear_1 | acc_clear_2 | acc_clear_3 | acc_clear_4),
     .data_sel(activation_buffer_set_select),
-    .data_out1(forget_write),
-    .data_out2(input_write),
+    .data_out1(input_write),
+    .data_out2(forget_write),
     .data_out3(candidate_write),
     .data_out4(output_write)
 );
@@ -933,8 +938,8 @@ end
 ) element_wise_inst(.clk(clk),
     .rst(rst_n),
     .start(done_data),
-    .i_register_i(el_input_in),  // Input gate (i)
-    .f_register_i(el_forget_in),  // Forget gate (f)
+    .i_register_i(el_forget_in),  // Input gate (i)
+    .f_register_i(el_input_in),  // Forget gate (f)
     .c_register_i(el_candidate_in),  // Cell gate (g)
     .o_register_i(el_output_in),  // Output gate (o)
     .ct_minus_1(ct_read_data),    // C(t-1)

@@ -45,12 +45,9 @@ adder #(
     .sum(register_c),
     .overflow()
 );
-tanh #(
-    .INPUT_WIDTH(WIDTH),
-    .OUTPUT_WIDTH(WIDTH)
-) tanh_inst (
-    .input_value(register_c),
-    .tanh_out(tanh_out)
+tanh tanh_inst (
+    .x(register_c),
+    .y(tanh_out)
 );
 multiplier #(
     .WIDTH(WIDTH),

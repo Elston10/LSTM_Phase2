@@ -28,7 +28,8 @@ module bram_burst #(
     output reg                    we2,
     output reg                    we3,
     output reg [7:0]              burst_write_count
-    ,output wire                  almost_full_pulse // 1-cycle pulse when almost full (2 or fewer locations left)
+    ,output wire                  almost_full_pulse, // 1-cycle pulse when almost full (2 or fewer locations left)
+    input wire inter_rst
 );
 
     // FSM states
@@ -84,7 +85,7 @@ assign full_burst_pulse = full & ~full_d; // 1-cycle pulse when full goes
     // Main sequential block
     //==================================================
     always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n | inter_rst) begin
             state <= IDLE;
             done <= 1'b0;
             full <= 1'b0;

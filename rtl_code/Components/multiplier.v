@@ -1,32 +1,47 @@
 module multiplier #(
-    parameter WIDTH      = 16,
-    parameter FRAC_BITS  = 8
+    parameter WIDTH      = 16, // Total bits (1 sign + integer + fraction)
+    parameter FRAC_BITS  = 8,  // Number of fractional bits
+    parameter INT_BITS   = 7   // Number of integer bits
 )(
-    input  signed [WIDTH-1:0] a,
-    input  signed [WIDTH-1:0] b,
-    output reg signed [WIDTH-1:0] prod,
-    output reg overflow
+    input  [WIDTH-1:0] a,
+    input  [WIDTH-1:0] b,
+    output [WIDTH-1:0] prod,
+    output overflow
 );
-    // 1. Perform signed multiplication (double width)
-    wire signed [(2*WIDTH)-1:0] full_prod = a * b;
 
-    // 2. Shift to align binary point
-    wire signed [(2*WIDTH)-1:0] shifted_prod = full_prod >>> FRAC_BITS;
+    // Extract signs and magnitudes
+    wire sign_a = a[WIDTH-1];
+    wire sign_b = b[WIDTH-1];
+    wire [WIDTH-2:0] mag_a = a[WIDTH-2:0];  // 15 bits
+    wire [WIDTH-2:0] mag_b = b[WIDTH-2:0];  // 15 bits
 
-    // 3. Overflow Detection
-    wire signed [WIDTH-1:0] max_pos = {1'b0, {(WIDTH-1){1'b1}}};
-    wire signed [WIDTH-1:0] max_neg = {1'b1, {(WIDTH-1){1'b0}}};
+    // Multiply unsigned magnitudes (30-bit result)
+    wire [(2*(WIDTH-1))-1:0] full_prod = mag_a * mag_b;
 
-    always @* begin
-        if (shifted_prod > max_pos) begin
-            prod = max_pos;
-            overflow = 1;
-        end else if (shifted_prod < max_neg) begin
-            prod = max_neg;
-            overflow = 1;
-        end else begin
-            prod = shifted_prod[WIDTH-1:0];
-            overflow = 0;
-        end
-    end
+    // Adjust for fractional bits
+    wire [(2*(WIDTH-1))-1:0] shifted = full_prod >> FRAC_BITS;
+
+    // Compute final sign (XOR of input signs)
+    wire sign_out = sign_a ^ sign_b;
+
+    // Maximum magnitudes for positive and negative numbers
+    localparam [WIDTH-2:0] MAX_POS_MAG = {(WIDTH-1){1'b1}};        // 32767 for +127.996
+    localparam [WIDTH-2:0] MAX_NEG_MAG = {1'b1, {(WIDTH-2){1'b0}}}; // 32768 for -128.000
+
+    // Candidate magnitude (truncate to WIDTH-1 bits)
+    wire [WIDTH-2:0] mag_result = shifted[WIDTH-2:0];
+
+    // Enhanced overflow detection for both positive and negative
+    wire pos_overflow = (~sign_out) & (shifted > MAX_POS_MAG);  // Positive overflow
+    wire neg_overflow = sign_out & (shifted > MAX_NEG_MAG);     // Negative overflow
+    assign overflow = pos_overflow | neg_overflow;
+
+    // Saturate based on sign
+    wire [WIDTH-2:0] sat_mag = overflow ? 
+                               (sign_out ? MAX_NEG_MAG : MAX_POS_MAG) : 
+                               mag_result;
+
+    // Zero case: if magnitude is zero, force sign to 0
+    assign prod = {(sat_mag == 0) ? 1'b0 : sign_out, sat_mag};
+
 endmodule
