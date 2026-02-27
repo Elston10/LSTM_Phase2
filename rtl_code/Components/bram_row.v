@@ -14,8 +14,10 @@ module bram_row #(
     input  wire                     rd_en,     // read enable
     output wire [DATA_WIDTH-1:0]    dout,
     output wire                     done,read_done_out,
-    output reg [ADDR_WIDTH:0] write_count
+    output reg [ADDR_WIDTH:0] write_count,
+    input wire inter_rst
 );
+ reg read_done;
   assign read_done_out=read_done;
 
     // ----------------------------------------------------
@@ -25,14 +27,14 @@ module bram_row #(
     reg [ADDR_WIDTH-1:0] read_count;    
     // Counter to track number of writes
     reg                done_write;
-    reg read_done;
+   
     assign done = (reset_done == 1'b0) ? done_write : 1'b0;
 
     // ----------------------------------------------------
     // Write Operation
     // ----------------------------------------------------
    always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         write_count <= 0;
         done_write  <= 0;
         read_count  <= 0;  

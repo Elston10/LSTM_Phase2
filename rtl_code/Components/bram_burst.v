@@ -72,13 +72,14 @@ always @(posedge clk or negedge rst_n) begin
     else
         almost_full_d <= almost_full;
 end
+reg full;
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n)
         full_d <= 1'b0;
     else
         full_d <= full;
 end
-reg full;
+
 wire full_burst_pulse;
 assign full_burst_pulse = full & ~full_d; // 1-cycle pulse when full goes
     //==================================================

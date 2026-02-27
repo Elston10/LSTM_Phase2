@@ -69,7 +69,7 @@ wire burst_full;  // Indicates tile buffer is completely filled
 // One-cycle delayed pulse for burst_full
 reg burst_full_d;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         burst_full_d <= 1'b0;
     else
         burst_full_d <= burst_full;
@@ -81,7 +81,7 @@ reg write_buffer_select;  // Controls which buffer to WRITE to (load)
 reg read_buffer_select_prev;
 // Detect rising edge of read_buffer_select
 always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
+        if (!rst_n | inter_rst)
             read_buffer_select_prev <= 1'b0;
         else
             read_buffer_select_prev <= read_buffer_select;
@@ -118,7 +118,7 @@ wire tiles_ready;
 wire almost_full;
 reg tiles_ready_prev;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         tiles_ready_prev <= 1'b0;
     else
         tiles_ready_prev <= tiles_ready;
@@ -146,7 +146,7 @@ assign start_burst_cond = weight_loaded && data_loaded && !done_burst &&
                      (state == LOAD_FIRST || state == COMPUTE);
 reg prev_start_burst_cond;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         prev_start_burst_cond <= 1'b0;
     else
         prev_start_burst_cond <= start_burst_cond;
@@ -154,7 +154,7 @@ end
 
 reg burst_done_d;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         burst_done_d <= 1'b0;
     else
         burst_done_d <= done_burst;
@@ -164,7 +164,7 @@ wire read_done_out_1,read_done_out_2;
 reg start_burst_d;
 reg read_buffer_select_rising_d;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         read_buffer_select_rising_d <= 1'b0;
     else
         read_buffer_select_rising_d<=read_buffer_select_rising;
@@ -173,7 +173,7 @@ end
 wire read_buffer_select_falling = ~read_buffer_select & read_buffer_select_prev;
 reg read_buffer_select_falling_d;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         read_buffer_select_falling_d <= 1'b0;
     else
         read_buffer_select_falling_d <= read_buffer_select_falling;
@@ -182,7 +182,7 @@ reg signed [7:0] next_addr_reg;
 assign start_compute = (read_buffer_select_rising_d || read_buffer_select_falling_d) ? 1'b1 : 1'b0;
 // Example: assign start_compute_falling = (read_buffer_select_falling_d) ? 1'b1 : 1'b0;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
       next_addr_reg <=0;    
     else if (almost_full && state==COMPUTE && compute_count>=1 )begin
         next_addr_reg <= next_addr_reg +4;
@@ -192,7 +192,7 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
        reset_done<=0;
     end else begin
         if(tiles_ready && !prev_tiles_ready)
@@ -203,7 +203,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 // --- Data Tile Write Enable Logic ---
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         we_data<=1'b0;
         write_active<=0;
         base_addr_reg_1 <= 0;
@@ -255,7 +255,7 @@ end
 // --- Data Tile Address Increment Logic ---
 reg [7:0] tile_count;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         tile_count <= 0;
     end else begin
         if (done_burst) begin
@@ -291,7 +291,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 // --- Load Flags ---
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n |inter_rst) begin
         weight_loaded <= 0;
         data_loaded   <= 0;
     end else begin
@@ -305,7 +305,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 // ------------------- FSM STATE REGISTER -------------------
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         state <= IDLE;
     else
         state <= next_state;
@@ -352,7 +352,7 @@ always @(posedge clk or negedge rst_n)begin
   end
 end
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         computing <= 0;
     else if (start_compute)
         computing <= 1;
@@ -362,7 +362,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 // Removed - compute_count now handled in dedicated always block at line 335
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         read_buffer_select  <= 1'b0;
         write_buffer_select <= 1'b0;
         data_sel <= 2'b00;
@@ -443,7 +443,7 @@ reg [6:0] tile_in_row_counter; // Enough bits for number of tiles per row group
 reg row_jumped_reg;
 assign row_jumped = row_jumped_reg;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         tile_in_row_counter <= 0;
         row_jumped_reg <= 0;
     end else if (done_burst) begin
@@ -481,7 +481,8 @@ data_global_bram #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(7)) data_bram (
     .we(we),
     .re((we_data)),  // Read enable when either buffer is being written
     .dout(gb_dout_data),
-    .done(global_done_data)
+    .done(global_done_data),
+    .inter_rst(inter_rst)
 );
 
 // ---------------- BURST ENGINE ----------------------------
@@ -524,7 +525,8 @@ bram_row #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(2)) data_tile_bram0 (
     .dout(tile_data0),
     .done(data_done_1),
     .read_done_out(read_done_out_1),
-    .write_count(write_count_1) 
+    .write_count(write_count_1) ,
+    .inter_rst(inter_rst)
 );
 
 // Data buffer B - writes when write_buffer_select=1, reads when read_buffer_select=1
@@ -539,7 +541,8 @@ bram_row #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(2)) data_tile_bram1 (
     .dout(tile_data1),
     .done(data_done_2),
     .read_done_out(read_done_out_2),
-    .write_count(write_count_2) 
+    .write_count(write_count_2),
+    .inter_rst(inter_rst) 
 );
 
 // ---------------- WEIGHT TILE BRAMs (Set A - Buffer 0) -------------------
@@ -659,7 +662,8 @@ accumulated_adder #(
     .clear(acc_clear_1),  
     .valid_in(compute_done), 
     .tile_sum(pe1),         
-    .acc_sum(accumulated_sum1)        
+    .acc_sum(accumulated_sum1),
+    .inter_rst(inter_rst)        
 );
 accumulated_adder #(
     .DATA_WIDTH(OUTPUT_WIDTH)
@@ -669,7 +673,8 @@ accumulated_adder #(
     .clear(acc_clear_2),  
     .valid_in(done_row1), 
     .tile_sum(pe2),         
-    .acc_sum(accumulated_sum2)
+    .acc_sum(accumulated_sum2),
+    .inter_rst(inter_rst)  
 );
 accumulated_adder #(
     .DATA_WIDTH(OUTPUT_WIDTH)
@@ -679,7 +684,8 @@ accumulated_adder #(
     .clear(acc_clear_3),  
     .valid_in(done_row2), 
     .tile_sum(pe3),         
-    .acc_sum(accumulated_sum3) 
+    .acc_sum(accumulated_sum3),
+    .inter_rst(inter_rst)  
 );  
 accumulated_adder #(
     .DATA_WIDTH(OUTPUT_WIDTH)
@@ -689,7 +695,8 @@ accumulated_adder #(
     .clear(acc_clear_4),  
     .valid_in(done_row3), 
     .tile_sum(pe4),         
-    .acc_sum(accumulated_sum4)  
+    .acc_sum(accumulated_sum4),
+    .inter_rst(inter_rst)   
 );
 // ------------FINAL TILED OUTPUT BUFFERING-------------------- 
 reg [4:0] tile_count_reg_1,tile_count_reg_2,tile_count_reg_3,tile_count_reg_4;
@@ -710,7 +717,7 @@ wire [ADDR_WIDTH-1:0] output_write_count_1;
 wire [OUTPUT_WIDTH-1:0] output_data;
 
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
        output_write_addr<=0;
        tile_count_reg_1<=0;
        tile_count_reg_2<=0;
@@ -745,7 +752,7 @@ mux4to1 #(
 //---------------- ACTIVATION FUNCTION AND OUTPUT BUFFERING -------------------
 reg [1:0] activation_buffer_set_select; // 2-bit signal to select among 4 buffer sets
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         activation_buffer_set_select <= 0;
     end else begin
         if(tile_count_reg_1==(MATRIX_COLS/TILE_WIDTH)+1)
@@ -770,9 +777,11 @@ mod4_selector #(
 reg gate_read;
 // Combined activation buffer control and address management
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         activation_buffer_set_select <= 2'b00;  // Start with forget gate
         output_write_addr <= 0;
+        output_read_addr <= 0;
+
     end else begin
         // When a complete row of accumulated results is done
         if (en_output_write) begin
@@ -818,7 +827,7 @@ sigmoid #(.WIDTH(16),
 );
 reg reset_done_gate;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) 
+    if (!rst_n | inter_rst) 
     reset_done_gate<=0;
 end
 wire done_forget, done_input, done_candidate, done_output;
@@ -849,7 +858,8 @@ bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_W
     .rd_addr(output_read_addr),
     .dout(el_forget_in),
     .done(done_forget),
-    .read_done_out(read_done_forget)
+    .read_done_out(read_done_forget),
+    .inter_rst(inter_rst)
 );
 bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) input_bram (
     .clk(clk),
@@ -862,7 +872,8 @@ bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_W
     .rd_addr(output_read_addr),
     .dout(el_input_in),
     .done(done_input),
-    .read_done_out(read_done_input)
+    .read_done_out(read_done_input),
+    .inter_rst(inter_rst)
 );
 bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) candidate_bram (
     .clk(clk),
@@ -875,7 +886,8 @@ bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_W
     .rd_addr(output_read_addr),
     .dout(el_candidate_in),
     .done(done_candidate),
-    .read_done_out(read_done_candidate)
+    .read_done_out(read_done_candidate),
+    .inter_rst(inter_rst)
 );  
 
 bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) output_bram (
@@ -889,10 +901,11 @@ bram_row #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_W
     .rd_addr(output_read_addr),
     .dout(el_output_in),
     .done(done_output),
-    .read_done_out(read_done_output)
+    .read_done_out(read_done_output),
+    .inter_rst(inter_rst)
 );
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
        gate_read<=0;
     end else begin
         if (done_data) begin
@@ -900,25 +913,16 @@ always @(posedge clk or negedge rst_n) begin
         end
     end
 end
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-       output_read_addr<=0;
-    if(gate_read)
-       output_read_addr<=output_read_addr+1;
-    end
-end
+
 //---------------- ELEMENT-WISE COMPUTATION -------------------
 integer k;
 reg ct_we;
 reg [DATA_WIDTH-1:0] ct_minus_1[DATA_MEM_SIZE-1:0];
 reg [ADDR_WIDTH-1:0] ct_minus_1_read_addr,ct_minus_1_write_addr;
 wire [DATA_WIDTH-1:0] ct_read_data,ct_output;
-assign ct_read_data = (gate_read)?ct_minus_1[ct_minus_1_read_addr]:0;
+// assign ct_read_data = (gate_read)?ct_minus_1[ct_minus_1_read_addr]:0;
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        for (k = 0; k < DATA_MEM_SIZE; k = k + 1) begin
-            ct_minus_1[k] <= 0;
-        end
+    if (!rst_n | inter_rst) begin
         ct_minus_1_read_addr<=0;
         ct_minus_1_write_addr<=0;
         ct_we<=1'b0;
@@ -933,6 +937,14 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 end
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        for (k = 0; k < DATA_MEM_SIZE; k = k + 1) begin
+            ct_minus_1[k] <= 0;
+        end
+    end
+
+    end 
  element_wise #(
     .DATA_WIDTH(DATA_WIDTH)
 ) element_wise_inst(.clk(clk),
@@ -949,18 +961,34 @@ end
 wire read_ct_done,write_ct_done;
 wire [DATA_WIDTH-1:0]ct_in;
 assign ct_in = ct_output;
-bram_row_modified #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) ct_minus_1_bram (
+wire ct_we_ff;
+wire [15:0] ct_in_ff,ct_minus_1_write_addr_ff;
+bram_row_ct #(.MEM_SIZE(DATA_MEM_SIZE), .DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) ct_minus_1_bram (
     .clk(clk),
     .rst_n(rst_n),
-    .we(ct_we),
-    .addr(ct_minus_1_write_addr),
-    .reset_done(reset_done_gate),
-    .din(ct_in),
-    .rd_en(gate_read),
+    .addr(ct_minus_1_write_addr_ff),
     .rd_addr(ct_minus_1_read_addr),
+    .din(ct_in_ff),
+    .we(ct_we_ff),
+    .rd_en(gate_read),
     .dout(ct_read_data),
-    .done(write_ct_done),
-    .read_done_out(read_ct_done)
+    .inter_rst(inter_rst)
+
 );
-//---------------- SEQUENCE FEATURE OF LSTM -------------------
+dff we_ff (
+    .clk(clk),
+    .d(ct_we),
+    .q(ct_we_ff)
+);
+dff_16bit write_data_ff (
+    .clk(clk),
+    .d(ct_in),
+    .q(ct_in_ff)
+);
+dff_16bit wr_addr_ff (
+    .clk(clk),
+    .d(ct_minus_1_write_addr),
+    .q(ct_minus_1_write_addr_ff)
+);
+//---------------- SEQUENCE FEATURE OF LSTM ------------------
 endmodule

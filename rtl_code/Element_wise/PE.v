@@ -1,5 +1,5 @@
 module PE #(
-    parameter WIDTH = 12,
+    parameter WIDTH = 16,
     parameter FRAC_BITS = 8,
     parameter INT_BITS = 7
 ) (

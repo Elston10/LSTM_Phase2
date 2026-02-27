@@ -14,7 +14,8 @@ module bram_row_modified #(
     input  wire                     rd_en,     // read enable
     output wire [DATA_WIDTH-1:0]    dout,
     output wire                     done,read_done_out,
-    output reg [ADDR_WIDTH:0] write_count
+    output reg [ADDR_WIDTH:0] write_count,
+    input wire inter_rst
 );
   assign read_done_out=read_done;
 
@@ -33,14 +34,11 @@ module bram_row_modified #(
     // Write Operation
     // ----------------------------------------------------
    always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
+    if (!rst_n | inter_rst) begin
         write_count <= 0;
         done_write  <= 0;
         read_count  <= 0;  
         read_done   <= 0;
-        for (i = 0; i < MEM_SIZE; i = i + 1) begin
-            bram[i] <= {DATA_WIDTH{1'b0}};
-        end
     end 
     // Write operation
     else if (we && !done_write) begin
@@ -71,11 +69,16 @@ module bram_row_modified #(
     end
 end
 
-
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        for (i = 0; i < MEM_SIZE; i = i + 1) begin
+            bram[i] <= {DATA_WIDTH{1'b0}};
+        end
+    end end
     // ----------------------------------------------------
     // Read Operation - COMBINATIONAL (asynchronous)
     // Uses separate read address for independent read/write access
     // ----------------------------------------------------
-    assign dout = (rd_en && done_write) ? bram[rd_addr] : {DATA_WIDTH{1'b0}};
+    assign dout = (rd_en && done_write ) ? bram[rd_addr] : {DATA_WIDTH{1'b0}};
 
 endmodule

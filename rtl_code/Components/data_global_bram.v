@@ -12,7 +12,8 @@ module data_global_bram #(
     input  wire                 we,
     input  wire                 re,
     output reg  [DATA_WIDTH-1:0] dout,
-    output reg                   done
+    output reg                   done,
+    input wire inter_rst
 );
 
     localparam MAX_COUNT = MEM_SIZE; 
@@ -27,7 +28,7 @@ module data_global_bram #(
     // Write + Done Logic (Uses wr_addr)
     // ------------------------------
     always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n | inter_rst) begin
             write_count <= 0;
             done        <= 1'b0;
         end 

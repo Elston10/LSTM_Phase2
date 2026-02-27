@@ -6,7 +6,8 @@ module accumulated_adder #(
     input  wire                  clear,      // Synchronous clear accumulator
     input  wire                  valid_in,   // Assert when tile result is valid
     input  wire [DATA_WIDTH-1:0] tile_sum,   // Tile result to accumulate
-    output reg  [DATA_WIDTH-1:0] acc_sum
+    output reg  [DATA_WIDTH-1:0] acc_sum,
+    input wire inter_rst
 );
 
 // Wire for adder output
@@ -21,7 +22,7 @@ adder #(.WIDTH(DATA_WIDTH)) acc_adder (
 );
 
 always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
+    if (!rst_n | inter_rst)
         acc_sum <= {DATA_WIDTH{1'b0}};
     else if (clear)
         acc_sum <= {DATA_WIDTH{1'b0}};

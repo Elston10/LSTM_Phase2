@@ -1,5 +1,5 @@
 module element_wise #(
-    parameter DATA_WIDTH = 12,
+    parameter DATA_WIDTH = 16,
     parameter ADDRESS_BITS = 12
 ) (
     input clk,
