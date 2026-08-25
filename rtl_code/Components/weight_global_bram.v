@@ -12,7 +12,7 @@ module weight_global_bram #(
     input  wire                 we,
     input  wire                 re,
     output reg  [DATA_WIDTH-1:0] dout,
-    output reg done
+    output done
 );
 
     reg [DATA_WIDTH-1:0] bram [0:MEM_SIZE-1];
@@ -21,8 +21,7 @@ module weight_global_bram #(
     // SIMULATION LOAD
     // ------------------------------
     initial begin
-        $readmemh(MEM_FILE, bram);
-        done = 1'b1; // Always done since pre-loaded
+        $readmemh("weights.mem", bram);
     end
 
     // ------------------------------
@@ -40,5 +39,5 @@ module weight_global_bram #(
         if (re)
             dout <= bram[rd_addr];
     end
-
+assign done = 1'b1; // Always done since pre-loaded
 endmodule

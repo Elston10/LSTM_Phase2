@@ -463,7 +463,7 @@ weight_global_bram #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .MEM_SIZE(WEIGHT_MEM_SIZE),
-    .MEM_FILE("lstm_weight_ih_l0_7_8_1.mem")
+    .MEM_FILE("weights.mem")
 ) weight_bram (
     .clk(clk), .rst_n(rst_n),
     .rd_addr(gb_addr),
@@ -950,8 +950,8 @@ always @(posedge clk or negedge rst_n) begin
 ) element_wise_inst(.clk(clk),
     .rst(rst_n),
     .start(done_data),
-    .i_register_i(el_forget_in),  // Input gate (i)
-    .f_register_i(el_input_in),  // Forget gate (f)
+    .i_register_i(el_input_in),  // Input gate (i)
+    .f_register_i(el_forget_in),  // Forget gate (f)
     .c_register_i(el_candidate_in),  // Cell gate (g)
     .o_register_i(el_output_in),  // Output gate (o)
     .ct_minus_1(ct_read_data),    // C(t-1)

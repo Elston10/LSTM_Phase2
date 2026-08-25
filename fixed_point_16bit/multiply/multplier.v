@@ -20,7 +20,6 @@ module mul_fixed #(
 
     // Adjust for fractional bits
     wire [(2*(WIDTH-1))-1:0] shifted = full_prod >> FRAC_BITS;
-
     // Compute final sign (XOR of input signs)
     wire sign_out = sign_a ^ sign_b;
 

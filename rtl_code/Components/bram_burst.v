@@ -80,7 +80,7 @@ always @(posedge clk or negedge rst_n) begin
         full_d <= full;
 end
 
-wire full_burst_pulse;
+
 assign full_burst_pulse = full & ~full_d; // 1-cycle pulse when full goes
     //==================================================
     // Main sequential block
